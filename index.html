@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart DayPlanner - 스마트 일정 플래너</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts Inter & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans KR"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .calendar-grid-cell {
+      min-height: 105px;
+      transition: all 0.15s ease-in-out;
+    }
+    .calendar-grid-cell:hover {
+      background-color: #f8fafc;
+    }
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-700">
+
+  <!-- 상단 네비게이션 헤더 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- 로고 및 오늘 날짜 바로가기 -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+          <i class="fa-solid fa-calendar-check text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight tracking-tight">PlanFlow</h1>
+          <p class="text-xs text-slate-500 font-medium">스마트 데일리 & 위클리 플래너</p>
+        </div>
+      </div>
+
+      <!-- 상단 컨트롤러: 월/주 이동 & 오늘 버튼 -->
+      <div class="flex items-center space-x-2 sm:space-x-4">
+        <button id="todayBtn" class="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+          오늘
+        </button>
+        <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg">
+          <button id="prevBtn" class="w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-white transition-all shadow-xs" title="이전">
+            <i class="fa-solid fa-chevron-left text-xs"></i>
+          </button>
+          <span id="currentPeriodLabel" class="text-sm font-bold text-slate-800 px-2 sm:px-3 whitespace-nowrap min-w-[120px] text-center">
+            2026년 11월
+          </span>
+          <button id="nextBtn" class="w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-white transition-all shadow-xs" title="다음">
+            <i class="fa-solid fa-chevron-right text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 뷰 모드 전환 & 일정 추가 버튼 -->
+      <div class="flex items-center space-x-2">
+        <div class="hidden sm:flex bg-slate-100 p-1 rounded-xl">
+          <button data-view="month" class="view-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-600 shadow-xs transition-all">월간</button>
+          <button data-view="week" class="view-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all">주간</button>
+          <button data-view="timeline" class="view-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all">일정목록</button>
+        </div>
+        
+        <button id="openAddModalBtn" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3.5 py-2 rounded-xl shadow-sm hover:shadow transition-all">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span class="hidden sm:inline">새 일정</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 레이아웃 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col">
+    <!-- 상단 대시보드 요약 바 -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">오늘의 일정</p>
+          <p id="statTodayCount" class="text-xl font-bold text-slate-800 mt-0.5">0개</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-sun"></i>
+        </div>
+      </div>
+      <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">이번 주 일정</p>
+          <p id="statWeekCount" class="text-xl font-bold text-slate-800 mt-0.5">0개</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-calendar-week"></i>
+        </div>
+      </div>
+      <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">완료한 일정</p>
+          <p id="statCompletedCount" class="text-xl font-bold text-slate-800 mt-0.5">0개</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+      <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500">진행률</p>
+          <p id="statProgressPct" class="text-xl font-bold text-indigo-600 mt-0.5">0%</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- 툴바 및 필터 -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+        <div class="relative w-full max-w-xs">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" placeholder="일정 검색 (제목, 메모, 장소)" class="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 focus:outline-indigo-500 focus:bg-white transition-all">
+        </div>
+      </div>
+
+      <!-- 모바일용 뷰 전환 토글 (화면이 작을 때 표시) -->
+      <div class="flex sm:hidden bg-slate-100 p-1 rounded-xl text-xs w-full justify-between">
+        <button data-view="month" class="view-btn flex-1 py-1.5 font-semibold rounded-lg bg-white text-indigo-600 shadow-xs">월간</button>
+        <button data-view="week" class="view-btn flex-1 py-1.5 font-medium rounded-lg text-slate-600">주간</button>
+        <button data-view="timeline" class="view-btn flex-1 py-1.5 font-medium rounded-lg text-slate-600">목록</button>
+      </div>
+
+      <!-- 카테고리 필터 태그 -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto text-xs">
+        <span class="text-slate-400 text-xs mr-1 hidden sm:inline"><i class="fa-solid fa-filter"></i></span>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-800 text-white" data-cat="all">전체</button>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="work">💼 업무</button>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="personal">🏡 개인</button>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="study">📚 공부</button>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="health">🏃 운동</button>
+        <button class="cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200" data-cat="important">⭐ 중요</button>
+      </div>
+    </div>
+
+    <!-- 뷰 영역 컨테이너 -->
+    <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+      <!-- 1. 월간 달력 뷰 -->
+      <div id="monthView" class="view-panel flex-1 flex flex-col">
+        <!-- 요일 헤더 -->
+        <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 text-center py-2.5 text-xs font-semibold text-slate-500">
+          <div class="text-rose-500">일</div>
+          <div>월</div>
+          <div>화</div>
+          <div>수</div>
+          <div>목</div>
+          <div>금</div>
+          <div class="text-blue-500">토</div>
+        </div>
+        <!-- 달력 일자 그리드 -->
+        <div id="calendarDaysGrid" class="grid grid-cols-7 flex-1 auto-rows-fr divide-x divide-y divide-slate-100">
+          <!-- 동적 날짜 셀 렌더링 -->
+        </div>
+      </div>
+
+      <!-- 2. 주간 뷰 -->
+      <div id="weekView" class="view-panel flex-1 hidden flex-col overflow-y-auto">
+        <div id="weekHeaderRow" class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 sticky top-0 z-10 text-center py-3">
+          <!-- 동적 주간 헤더 -->
+        </div>
+        <div id="weekContentGrid" class="grid grid-cols-7 flex-1 divide-x divide-slate-100 min-h-[500px]">
+          <!-- 요일별 세로 컬럼 -->
+        </div>
+      </div>
+
+      <!-- 3. 일정 목록 & 타임라인 뷰 -->
+      <div id="timelineView" class="view-panel flex-1 hidden flex-col p-4 sm:p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-bold text-slate-800">상세 일정 목록</h2>
+          <span id="timelineCountNotice" class="text-xs text-slate-500"></span>
+        </div>
+        <div id="timelineList" class="space-y-3">
+          <!-- 동적 일정 카드 목록 -->
+        </div>
+        <!-- 빈 목록 표시 -->
+        <div id="timelineEmpty" class="hidden text-center py-16">
+          <i class="fa-regular fa-calendar-xmark text-4xl text-slate-300 mb-3"></i>
+          <p class="text-sm font-medium text-slate-500">해당 조건의 일정이 없습니다.</p>
+          <button onclick="openCreateModal()" class="mt-3 text-xs text-indigo-600 font-semibold hover:underline">새로운 일정 추가하기</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 일정 추가 및 수정 모달 -->
+  <div id="eventModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+      <!-- 모달 헤더 -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 id="modalTitle" class="text-base font-bold text-slate-800">일정 추가</h3>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- 모달 본문 / 폼 -->
+      <form id="eventForm" class="p-6 space-y-4 overflow-y-auto flex-1 text-xs sm:text-sm">
+        <input type="hidden" id="eventId">
+
+        <!-- 제목 -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5" for="formTitle">일정 제목 <span class="text-rose-500">*</span></label>
+          <input type="text" id="formTitle" required placeholder="무슨 일인가요? (예: 팀 프로젝트 기획 회의)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 focus:border-indigo-500 transition-all text-sm">
+        </div>
+
+        <!-- 날짜 및 시간 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1.5" for="formDate">날짜 <span class="text-rose-500">*</span></label>
+            <input type="date" id="formDate" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 text-sm">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1.5" for="formTime">시간</label>
+            <input type="time" id="formTime" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 text-sm">
+          </div>
+        </div>
+
+        <!-- 종일 여부 및 카테고리 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1.5" for="formCategory">분류 카테고리</label>
+            <select id="formCategory" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 text-sm bg-white">
+              <option value="work">💼 업무 (Work)</option>
+              <option value="personal">🏡 개인 (Personal)</option>
+              <option value="study">📚 학업/공부 (Study)</option>
+              <option value="health">🏃 운동/건강 (Health)</option>
+              <option value="important">⭐ 중요 (Important)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1.5">종일 일정</label>
+            <div class="flex items-center h-[42px] px-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <label class="inline-flex items-center cursor-pointer gap-2">
+                <input type="checkbox" id="formAllDay" class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+                <span class="text-xs text-slate-600 font-medium">하루 종일 진행</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 장소 -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5" for="formLocation">장소</label>
+          <div class="relative">
+            <i class="fa-solid fa-location-dot absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="formLocation" placeholder="회의실 B, 강남역 카페, 온라인 화상 등" class="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 text-sm">
+          </div>
+        </div>
+
+        <!-- 컬러 태그 선택 -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5">테마 컬러</label>
+          <div class="flex items-center gap-3">
+            <label class="cursor-pointer">
+              <input type="radio" name="colorTheme" value="indigo" checked class="sr-only peer">
+              <span class="w-7 h-7 rounded-full bg-indigo-500 block peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-indigo-600 transition-all"></span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="colorTheme" value="emerald" class="sr-only peer">
+              <span class="w-7 h-7 rounded-full bg-emerald-500 block peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-emerald-600 transition-all"></span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="colorTheme" value="amber" class="sr-only peer">
+              <span class="w-7 h-7 rounded-full bg-amber-500 block peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-amber-600 transition-all"></span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="colorTheme" value="rose" class="sr-only peer">
+              <span class="w-7 h-7 rounded-full bg-rose-500 block peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-rose-600 transition-all"></span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="colorTheme" value="cyan" class="sr-only peer">
+              <span class="w-7 h-7 rounded-full bg-cyan-500 block peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-cyan-600 transition-all"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 상세 메모 -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5" for="formNotes">메모 및 세부 내용</label>
+          <textarea id="formNotes" rows="3" placeholder="준비물, 안건, 체크포인트를 자유롭게 적으세요" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-indigo-500 text-sm resize-none"></textarea>
+        </div>
+
+        <!-- 버튼 바 -->
+        <div class="pt-2 flex items-center justify-between gap-3 border-t border-slate-100">
+          <button type="button" id="deleteEventBtn" class="hidden px-4 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs sm:text-sm font-semibold transition-colors">
+            <i class="fa-regular fa-trash-can mr-1"></i> 삭제
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" id="cancelModalBtn" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-semibold transition-colors">취소</button>
+            <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-all">저장</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 일정 간이 뷰어 모달 (상세 보기) -->
+  <div id="viewEventModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden p-6 relative">
+      <button id="closeViewModalBtn" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+      <div id="viewContent">
+        <!-- 동적 상세 내용 주입 -->
+      </div>
+      <div class="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+        <button id="editFromViewBtn" class="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-xl text-xs font-semibold">
+          <i class="fa-solid fa-pen mr-1"></i> 수정
+        </button>
+        <button id="toggleCompleteFromViewBtn" class="px-4 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-semibold">
+          완료 처리
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림창 -->
+  <div id="toastMessage" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastText">알림 내용</span>
+  </div>
+
+  <script>
+    // ==========================================
+    // 상태 관리 (State Management)
+    // ==========================================
+    const STORAGE_KEY = 'planflow_events_data_v1';
+    
+    // 현재 표시 기준 날짜 (2026년 11월 기준 지원)
+    let currentDate = new Date();
+    let currentView = 'month'; // 'month', 'week', 'timeline'
+    let currentFilterCat = 'all';
+    let searchQuery = '';
+
+    // 샘플 데이터 및 로컬 스토리지 초기화
+    let events = [];
+
+    const defaultEvents = [];
+
+    function getFormattedDate(offsetDays) {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // ==========================================
+    // 스토리지 핸들러
+    // ==========================================
+    function loadEvents() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        try {
+          events = JSON.parse(data);
+        } catch (e) {
+          events = [];
+        }
+      } else {
+        events = [];
+        saveEvents();
+      }
+    }
+
+    function saveEvents() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      updateDashboardStats();
+    }
+
+    // ==========================================
+    // UI 토스트 유틸리티
+    // ==========================================
+    function showToast(message) {
+      const toast = document.getElementById('toastMessage');
+      const text = document.getElementById('toastText');
+      text.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    // ==========================================
+    // 카테고리 & 색상 매핑 유틸
+    // ==========================================
+    const CATEGORY_MAP = {
+      work: { label: '업무', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      personal: { label: '개인', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      study: { label: '학업/공부', badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      health: { label: '운동', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+      important: { label: '중요', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' }
+    };
+
+    const COLOR_CLASSES = {
+      indigo: { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300', dot: 'bg-indigo-500' },
+      emerald: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', dot: 'bg-emerald-500' },
+      amber: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', dot: 'bg-amber-500' },
+      rose: { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', dot: 'bg-rose-500' },
+      cyan: { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', dot: 'bg-cyan-500' },
+    };
+
+    // ==========================================
+    // 통계 대시보드 갱신
+    // ==========================================
+    function updateDashboardStats() {
+      const todayStr = getFormattedDate(0);
+      const todayEvents = events.filter(e => e.date === todayStr);
+      
+      // 이번 주 범위 (일요일 ~ 토요일)
+      const now = new Date();
+      const currentDay = now.getDay();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - currentDay);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      const weekEvents = events.filter(e => {
+        const d = new Date(e.date + 'T00:00:00');
+        return d >= startOfWeek && d <= endOfWeek;
+      });
+
+      const completedCount = events.filter(e => e.completed).length;
+      const totalCount = events.length;
+      const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      document.getElementById('statTodayCount').textContent = `${todayEvents.length}개`;
+      document.getElementById('statWeekCount').textContent = `${weekEvents.length}개`;
+      document.getElementById('statCompletedCount').textContent = `${completedCount}개`;
+      document.getElementById('statProgressPct').textContent = `${progress}%`;
+    }
+
+    // ==========================================
+    // 필터링 적용 목록 가져오기
+    // ==========================================
+    function getFilteredEvents() {
+      return events.filter(evt => {
+        // 카테고리 필터
+        if (currentFilterCat !== 'all' && evt.category !== currentFilterCat) {
+          return false;
+        }
+        // 검색 필터
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.toLowerCase();
+          const titleMatch = evt.title.toLowerCase().includes(q);
+          const noteMatch = (evt.notes || '').toLowerCase().includes(q);
+          const locMatch = (evt.location || '').toLowerCase().includes(q);
+          if (!titleMatch && !noteMatch && !locMatch) return false;
+        }
+        return true;
+      });
+    }
+
+    // ==========================================
+    // 뷰 렌더링 오케스트레이션
+    // ==========================================
+    function render() {
+      updatePeriodLabel();
+      if (currentView === 'month') {
+        renderMonthView();
+      } else if (currentView === 'week') {
+        renderWeekView();
+      } else if (currentView === 'timeline') {
+        renderTimelineView();
+      }
+      updateDashboardStats();
+    }
+
+    function updatePeriodLabel() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const label = document.getElementById('currentPeriodLabel');
+
+      if (currentView === 'month') {
+        label.textContent = `${year}년 ${month}월`;
+      } else if (currentView === 'week') {
+        const weekStart = getWeekStartDate(currentDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        label.textContent = `${weekStart.getMonth() + 1}.${weekStart.getDate()} ~ ${weekEnd.getMonth() + 1}.${weekEnd.getDate()}`;
+      } else {
+        label.textContent = `${year}년 ${month}월`;
+      }
+    }
+
+    function getWeekStartDate(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      d.setDate(d.getDate() - day);
+      return d;
+    }
+
+    // ------------------------------------------
+    // 1. 월간 뷰 (Month View)
+    // ------------------------------------------
+    function renderMonthView() {
+      const grid = document.getElementById('calendarDaysGrid');
+      grid.innerHTML = '';
+
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+
+      const startDayOfWeek = firstDayOfMonth.getDay();
+      const totalDays = lastDayOfMonth.getDate();
+
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+      const totalCells = Math.ceil((startDayOfWeek + totalDays) / 7) * 7;
+
+      const filtered = getFilteredEvents();
+      const todayStr = getFormattedDate(0);
+
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-grid-cell p-1.5 sm:p-2 border-slate-100 flex flex-col justify-between relative group';
+
+        let dateNum, cellDateStr, isOtherMonth = false;
+
+        if (i < startDayOfWeek) {
+          // 이전 달
+          dateNum = prevMonthLastDay - (startDayOfWeek - i - 1);
+          const prevMonth = month === 0 ? 12 : month;
+          const prevYear = month === 0 ? year - 1 : year;
+          cellDateStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`;
+          isOtherMonth = true;
+        } else if (i >= startDayOfWeek + totalDays) {
+          // 다음 달
+          dateNum = i - (startDayOfWeek + totalDays) + 1;
+          const nextMonth = month === 11 ? 1 : month + 2;
+          const nextYear = month === 11 ? year + 1 : year;
+          cellDateStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`;
+          isOtherMonth = true;
+        } else {
+          // 이번 달
+          dateNum = i - startDayOfWeek + 1;
+          cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`;
+        }
+
+        const isToday = cellDateStr === todayStr;
+
+        // 셀 상단 헤더
+        const topHeader = document.createElement('div');
+        topHeader.className = 'flex items-center justify-between mb-1';
+
+        const dayNumSpan = document.createElement('span');
+        dayNumSpan.className = `text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full transition-all ${
+          isToday
+            ? 'bg-indigo-600 text-white shadow-xs'
+            : isOtherMonth
+            ? 'text-slate-300'
+            : 'text-slate-700'
+        }`;
+        dayNumSpan.textContent = dateNum;
+        topHeader.appendChild(dayNumSpan);
+
+        // 셀에 빠른 추가 버튼 호버 시 표시
+        const addSmallBtn = document.createElement('button');
+        addSmallBtn.className = 'opacity-0 group-hover:opacity-100 text-slate-400 hover:text-indigo-600 p-0.5 text-xs transition-opacity';
+        addSmallBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+        addSmallBtn.title = '이 날짜에 추가';
+        addSmallBtn.onclick = (e) => {
+          e.stopPropagation();
+          openCreateModal(cellDateStr);
+        };
+        topHeader.appendChild(addSmallBtn);
+        cell.appendChild(topHeader);
+
+        // 일정 아이템 컨테이너
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]';
+
+        const dayEvents = filtered.filter(e => e.date === cellDateStr);
+
+        dayEvents.slice(0, 3).forEach(evt => {
+          const item = document.createElement('div');
+          const col = COLOR_CLASSES[evt.color] || COLOR_CLASSES.indigo;
+          item.className = `text-[10px] sm:text-xs px-1.5 py-0.5 rounded truncate cursor-pointer transition-all flex items-center gap-1 font-medium ${
+            evt.completed 
+              ? 'bg-slate-100 text-slate-400 line-through' 
+              : `${col.bg} ${col.text}`
+          }`;
+          
+          item.innerHTML = `
+            <span class="badge-dot ${col.dot} shrink-0 ${evt.completed ? 'opacity-40' : ''}"></span>
+            <span class="truncate">${evt.time ? `<span class="opacity-75 font-normal">${evt.time}</span> ` : ''}${escapeHtml(evt.title)}</span>
+          `;
+
+          item.onclick = (e) => {
+            e.stopPropagation();
+            showEventDetails(evt.id);
+          };
+          itemsContainer.appendChild(item);
+        });
+
+        // 3개 초과 시 +더보기 표시
+        if (dayEvents.length > 3) {
+          const moreBadge = document.createElement('div');
+          moreBadge.className = 'text-[9px] sm:text-[10px] text-slate-400 font-semibold px-1';
+          moreBadge.textContent = `+${dayEvents.length - 3}개 더보기`;
+          itemsContainer.appendChild(moreBadge);
+        }
+
+        cell.appendChild(itemsContainer);
+
+        // 날짜 셀 클릭 시 일정 등록 지원
+        cell.onclick = () => openCreateModal(cellDateStr);
+
+        grid.appendChild(cell);
+      }
+    }
+
+    // ------------------------------------------
+    // 2. 주간 뷰 (Week View)
+    // ------------------------------------------
+    function renderWeekView() {
+      const headerRow = document.getElementById('weekHeaderRow');
+      const contentGrid = document.getElementById('weekContentGrid');
+      headerRow.innerHTML = '';
+      contentGrid.innerHTML = '';
+
+      const weekStart = getWeekStartDate(currentDate);
+      const filtered = getFilteredEvents();
+      const todayStr = getFormattedDate(0);
+
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        const isToday = dateStr === todayStr;
+
+        // 요일 헤더 칼럼
+        const headerCell = document.createElement('div');
+        headerCell.className = `flex flex-col items-center justify-center py-1 ${i === 0 ? 'text-rose-500' : i === 6 ? 'text-blue-500' : 'text-slate-700'}`;
+        headerCell.innerHTML = `
+          <span class="text-xs font-semibold">${dayNames[i]}</span>
+          <span class="text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full mt-1 ${
+            isToday ? 'bg-indigo-600 text-white' : 'text-slate-800'
+          }">${d.getDate()}</span>
+        `;
+        headerRow.appendChild(headerCell);
+
+        // 요일 바디 칼럼
+        const colCell = document.createElement('div');
+        colCell.className = 'p-2 space-y-2 flex flex-col min-h-[450px] bg-white hover:bg-slate-50/50 transition-colors';
+        
+        const dayEvents = filtered.filter(e => e.date === dateStr);
+
+        // 정렬: 시간순
+        dayEvents.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+
+        dayEvents.forEach(evt => {
+          const card = document.createElement('div');
+          const col = COLOR_CLASSES[evt.color] || COLOR_CLASSES.indigo;
+          card.className = `p-2 rounded-xl text-xs border shadow-2xs cursor-pointer transition-transform hover:-translate-y-0.5 ${
+            evt.completed 
+              ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-70' 
+              : `${col.bg} ${col.border} ${col.text}`
+          }`;
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-white/60">
+                ${evt.allDay ? '종일' : (evt.time || '시간미정')}
+              </span>
+              <span class="badge-dot ${col.dot}"></span>
+            </div>
+            <p class="font-bold truncate ${evt.completed ? 'line-through' : ''}">${escapeHtml(evt.title)}</p>
+            ${evt.location ? `<p class="text-[10px] truncate opacity-80 mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${escapeHtml(evt.location)}</p>` : ''}
+          `;
+
+          card.onclick = () => showEventDetails(evt.id);
+          colCell.appendChild(card);
+        });
+
+        // 주간 뷰의 빈 공간 클릭 시 추가
+        colCell.ondblclick = () => openCreateModal(dateStr);
+
+        contentGrid.appendChild(colCell);
+      }
+    }
+
+    // ------------------------------------------
+    // 3. 목록 / 타임라인 뷰 (Timeline View)
+    // ------------------------------------------
+    function renderTimelineView() {
+      const list = document.getElementById('timelineList');
+      const empty = document.getElementById('timelineEmpty');
+      const countNotice = document.getElementById('timelineCountNotice');
+      list.innerHTML = '';
+
+      const filtered = getFilteredEvents();
+      // 날짜 및 시간 오름차순 정렬
+      filtered.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return (a.time || '00:00').localeCompare(b.time || '00:00');
+      });
+
+      countNotice.textContent = `총 ${filtered.length}개의 일정`;
+
+      if (filtered.length === 0) {
+        list.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      list.classList.remove('hidden');
+      empty.classList.add('hidden');
+
+      // 날짜별 그룹화
+      let lastDate = '';
+      filtered.forEach(evt => {
+        if (evt.date !== lastDate) {
+          lastDate = evt.date;
+          const dateHeader = document.createElement('div');
+          dateHeader.className = 'pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2';
+          
+          const dObj = new Date(evt.date + 'T00:00:00');
+          const dayName = ['일', '월', '화', '수', '목', '금', '토'][dObj.getDay()];
+          const isToday = evt.date === getFormattedDate(0);
+
+          dateHeader.innerHTML = `
+            <span>${evt.date} (${dayName})</span>
+            ${isToday ? '<span class="px-2 py-0.5 text-[10px] bg-indigo-600 text-white rounded-full font-bold">TODAY</span>' : ''}
+            <div class="flex-1 h-px bg-slate-200 ml-2"></div>
+          `;
+          list.appendChild(dateHeader);
+        }
+
+        const col = COLOR_CLASSES[evt.color] || COLOR_CLASSES.indigo;
+        const catInfo = CATEGORY_MAP[evt.category] || CATEGORY_MAP.work;
+
+        const row = document.createElement('div');
+        row.className = `group bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all flex items-start sm:items-center justify-between gap-3 ${
+          evt.completed ? 'bg-slate-50/70 border-dashed opacity-60' : ''
+        }`;
+
+        row.innerHTML = `
+          <div class="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+            <!-- 체크 토글 버튼 -->
+            <button class="toggle-check-btn mt-0.5 sm:mt-0 w-5 h-5 rounded-lg border flex items-center justify-center transition-colors ${
+              evt.completed 
+                ? 'bg-emerald-500 border-emerald-500 text-white' 
+                : 'border-slate-300 hover:border-indigo-500 text-transparent'
+            }">
+              <i class="fa-solid fa-check text-xs"></i>
+            </button>
+
+            <!-- 일정 정보 본문 -->
+            <div class="flex-1 min-w-0 cursor-pointer info-trigger">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="text-xs font-bold ${evt.completed ? 'line-through text-slate-400' : 'text-slate-800'}">
+                  ${escapeHtml(evt.title)}
+                </span>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catInfo.badgeClass}">
+                  ${catInfo.label}
+                </span>
+                ${evt.allDay ? '<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">종일</span>' : ''}
+              </div>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                ${evt.time ? `<span><i class="fa-regular fa-clock mr-1 text-slate-400"></i>${evt.time}</span>` : ''}
+                ${evt.location ? `<span><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i>${escapeHtml(evt.location)}</span>` : ''}
+                ${evt.notes ? `<span class="truncate max-w-xs text-slate-400"><i class="fa-regular fa-note-sticky mr-1"></i>${escapeHtml(evt.notes)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <!-- 우측 액션 버튼들 -->
+          <div class="flex items-center gap-1">
+            <button class="edit-btn p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-colors" title="수정">
+              <i class="fa-solid fa-pen text-xs"></i>
+            </button>
+            <button class="delete-btn p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors" title="삭제">
+              <i class="fa-regular fa-trash-can text-xs"></i>
+            </button>
+          </div>
+        `;
+
+        // 액션 이벤트 리스너 바인딩
+        row.querySelector('.toggle-check-btn').onclick = () => toggleEventCompletion(evt.id);
+        row.querySelector('.info-trigger').onclick = () => showEventDetails(evt.id);
+        row.querySelector('.edit-btn').onclick = () => openEditModal(evt.id);
+        row.querySelector('.delete-btn').onclick = () => deleteEvent(evt.id);
+
+        list.appendChild(row);
+      });
+    }
+
+    // ==========================================
+    // 일정 상세 모달 (View Modal)
+    // ==========================================
+    let activeViewingId = null;
+
+    function showEventDetails(id) {
+      const evt = events.find(e => e.id === id);
+      if (!evt) return;
+
+      activeViewingId = id;
+      const viewModal = document.getElementById('viewEventModal');
+      const content = document.getElementById('viewContent');
+      const catInfo = CATEGORY_MAP[evt.category] || CATEGORY_MAP.work;
+      const col = COLOR_CLASSES[evt.color] || COLOR_CLASSES.indigo;
+
+      content.innerHTML = `
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge-dot ${col.dot}"></span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${catInfo.badgeClass}">
+            ${catInfo.label}
+          </span>
+          ${evt.completed ? '<span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">완료됨</span>' : ''}
+        </div>
+        <h2 class="text-lg font-bold text-slate-900 mb-2 ${evt.completed ? 'line-through text-slate-400' : ''}">${escapeHtml(evt.title)}</h2>
+        
+        <div class="space-y-2 mt-4 text-xs sm:text-sm text-slate-600">
+          <div class="flex items-center gap-2">
+            <i class="fa-regular fa-calendar text-slate-400 w-5"></i>
+            <span>${evt.date} ${evt.allDay ? '(종일)' : (evt.time ? `• ${evt.time}` : '')}</span>
+          </div>
+          ${evt.location ? `
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-location-dot text-slate-400 w-5"></i>
+              <span>${escapeHtml(evt.location)}</span>
+            </div>
+          ` : ''}
+          ${evt.notes ? `
+            <div class="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 whitespace-pre-wrap text-xs leading-relaxed">
+              ${escapeHtml(evt.notes)}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      const compBtn = document.getElementById('toggleCompleteFromViewBtn');
+      compBtn.textContent = evt.completed ? '미완료로 변경' : '일정 완료 처리';
+      compBtn.className = evt.completed
+        ? 'px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl text-xs font-semibold'
+        : 'px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-semibold';
+
+      viewModal.classList.remove('hidden');
+    }
+
+    // ==========================================
+    // 생성/수정 폼 핸들러
+    // ==========================================
+    function openCreateModal(presetDate = null) {
+      const modal = document.getElementById('eventModal');
+      const form = document.getElementById('eventForm');
+      form.reset();
+
+      document.getElementById('eventId').value = '';
+      document.getElementById('modalTitle').textContent = '새 일정 추가';
+      document.getElementById('deleteEventBtn').classList.add('hidden');
+
+      // 날짜 세팅
+      document.getElementById('formDate').value = presetDate || getFormattedDate(0);
+      document.getElementById('formTime').value = '09:00';
+      document.getElementById('formAllDay').checked = false;
+
+      // 기본 컬러 라디오 버튼
+      const defaultColorRadio = document.querySelector('input[name="colorTheme"][value="indigo"]');
+      if (defaultColorRadio) defaultColorRadio.checked = true;
+
+      modal.classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const evt = events.find(e => e.id === id);
+      if (!evt) return;
+
+      const modal = document.getElementById('eventModal');
+      document.getElementById('modalTitle').textContent = '일정 수정';
+      document.getElementById('deleteEventBtn').classList.remove('hidden');
+
+      document.getElementById('eventId').value = evt.id;
+      document.getElementById('formTitle').value = evt.title;
+      document.getElementById('formDate').value = evt.date;
+      document.getElementById('formTime').value = evt.time || '';
+      document.getElementById('formAllDay').checked = !!evt.allDay;
+      document.getElementById('formCategory').value = evt.category || 'work';
+      document.getElementById('formLocation').value = evt.location || '';
+      document.getElementById('formNotes').value = evt.notes || '';
+
+      const colorRadio = document.querySelector(`input[name="colorTheme"][value="${evt.color || 'indigo'}"]`);
+      if (colorRadio) colorRadio.checked = true;
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('eventModal').classList.add('hidden');
+    }
+
+    function closeViewModal() {
+      document.getElementById('viewEventModal').classList.add('hidden');
+      activeViewingId = null;
+    }
+
+    function toggleEventCompletion(id) {
+      const idx = events.findIndex(e => e.id === id);
+      if (idx !== -1) {
+        events[idx].completed = !events[idx].completed;
+        saveEvents();
+        render();
+        showToast(events[idx].completed ? '일정을 완료 처리했습니다!' : '일정을 미완료로 변경했습니다.');
+      }
+    }
+
+    function deleteEvent(id) {
+      events = events.filter(e => e.id !== id);
+      saveEvents();
+      render();
+      closeModal();
+      closeViewModal();
+      showToast('일정이 삭제되었습니다.');
+    }
+
+    // HTML 태그 탈출 방지 헬퍼
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // ==========================================
+    // 이벤트 리스너 등록
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadEvents();
+
+      // 헤더 이전/다음/오늘 컨트롤
+      document.getElementById('todayBtn').addEventListener('click', () => {
+        currentDate = new Date();
+        render();
+      });
+
+      document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentView === 'month') {
+          currentDate.setMonth(currentDate.getMonth() - 1);
+        } else if (currentView === 'week') {
+          currentDate.setDate(currentDate.getDate() - 7);
+        } else {
+          currentDate.setMonth(currentDate.getMonth() - 1);
+        }
+        render();
+      });
+
+      document.getElementById('nextBtn').addEventListener('click', () => {
+        if (currentView === 'month') {
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        } else if (currentView === 'week') {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else {
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+        render();
+      });
+
+      // 뷰 탭 전환
+      const viewButtons = document.querySelectorAll('.view-btn');
+      viewButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const view = btn.dataset.view;
+          currentView = view;
+
+          // 모든 뷰 버튼 스타일 갱신
+          viewButtons.forEach(b => {
+            if (b.dataset.view === view) {
+              b.className = 'view-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-indigo-600 shadow-xs transition-all flex-1 sm:flex-initial';
+            } else {
+              b.className = 'view-btn px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex-1 sm:flex-initial';
+            }
+          });
+
+          // 뷰 패널 토글
+          document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+          if (view === 'month') document.getElementById('monthView').classList.remove('hidden');
+          else if (view === 'week') document.getElementById('weekView').classList.remove('hidden');
+          else if (view === 'timeline') document.getElementById('timelineView').classList.remove('hidden');
+
+          render();
+        });
+      });
+
+      // 카테고리 필터 버튼
+      const catButtons = document.querySelectorAll('.cat-filter-btn');
+      catButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentFilterCat = btn.dataset.cat;
+          catButtons.forEach(b => {
+            b.className = (b.dataset.cat === currentFilterCat)
+              ? 'cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-800 text-white'
+              : 'cat-filter-btn px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200';
+          });
+          render();
+        });
+      });
+
+      // 검색창 입력 이벤트
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        render();
+      });
+
+      // 모달 열기/닫기
+      document.getElementById('openAddModalBtn').addEventListener('click', () => openCreateModal());
+      document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+      document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+      document.getElementById('closeViewModalBtn').addEventListener('click', closeViewModal);
+
+      // 종일 여부 체크박스 연동
+      const allDayCheck = document.getElementById('formAllDay');
+      const timeInput = document.getElementById('formTime');
+      allDayCheck.addEventListener('change', () => {
+        if (allDayCheck.checked) {
+          timeInput.value = '';
+          timeInput.disabled = true;
+          timeInput.classList.add('bg-slate-100', 'text-slate-400');
+        } else {
+          timeInput.disabled = false;
+          timeInput.classList.remove('bg-slate-100', 'text-slate-400');
+          if (!timeInput.value) timeInput.value = '10:00';
+        }
+      });
+
+      // 폼 제출 (추가 / 수정)
+      document.getElementById('eventForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('eventId').value;
+        const title = document.getElementById('formTitle').value.trim();
+        const date = document.getElementById('formDate').value;
+        const time = document.getElementById('formTime').value;
+        const allDay = document.getElementById('formAllDay').checked;
+        const category = document.getElementById('formCategory').value;
+        const location = document.getElementById('formLocation').value.trim();
+        const notes = document.getElementById('formNotes').value.trim();
+        const colorRadio = document.querySelector('input[name="colorTheme"]:checked');
+        const color = colorRadio ? colorRadio.value : 'indigo';
+
+        if (!title || !date) {
+          return;
+        }
+
+        if (id) {
+          // 수정
+          const idx = events.findIndex(ev => ev.id === id);
+          if (idx !== -1) {
+            events[idx] = {
+              ...events[idx],
+              title,
+              date,
+              time: allDay ? '' : time,
+              allDay,
+              category,
+              location,
+              notes,
+              color
+            };
+            showToast('일정이 성공적으로 수정되었습니다.');
+          }
+        } else {
+          // 생성
+          const newEvent = {
+            id: 'evt-' + Date.now(),
+            title,
+            date,
+            time: allDay ? '' : time,
+            allDay,
+            category,
+            location,
+            notes,
+            color,
+            completed: false
+          };
+          events.push(newEvent);
+          showToast('새 일정이 등록되었습니다!');
+        }
+
+        saveEvents();
+        render();
+        closeModal();
+      });
+
+      // 모달 내 삭제 버튼
+      document.getElementById('deleteEventBtn').addEventListener('click', () => {
+        const id = document.getElementById('eventId').value;
+        if (id) deleteEvent(id);
+      });
+
+      // 뷰 모달 상세 내 액션 버튼
+      document.getElementById('editFromViewBtn').addEventListener('click', () => {
+        if (activeViewingId) {
+          const editId = activeViewingId;
+          closeViewModal();
+          openEditModal(editId);
+        }
+      });
+
+      document.getElementById('toggleCompleteFromViewBtn').addEventListener('click', () => {
+        if (activeViewingId) {
+          toggleEventCompletion(activeViewingId);
+          showEventDetails(activeViewingId);
+        }
+      });
+
+      // 백드롭 클릭 시 모달 닫기
+      window.addEventListener('click', (e) => {
+        const editModal = document.getElementById('eventModal');
+        const viewModal = document.getElementById('viewEventModal');
+        if (e.target === editModal) closeModal();
+        if (e.target === viewModal) closeViewModal();
+      });
+
+      // 최초 렌더링
+      render();
+    });
+  </script>
+</body>
+</html>
